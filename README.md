@@ -24,8 +24,8 @@ Customer churn poses a significant financial challenge in the telecommunications
 ---
 
 ## c. GitHub Repository & Live App Links
-* **GitHub Repository:** 
-* **Live Streamlit Web App:** 
+* **GitHub Repository:** `[PASTE_YOUR_GITHUB_REPO_URL_HERE]`
+* **Live Streamlit Web App:** `https://mlassignment22025ac05070-if4qpesuwzqbjfachkwdax.streamlit.app/`
 
 ---
 
