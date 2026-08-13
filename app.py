@@ -1,3 +1,4 @@
+%%writefile app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -5,6 +6,8 @@ import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
 from sklearn.metrics import (
     accuracy_score, roc_auc_score, precision_score, 
     recall_score, f1_score, matthews_corrcoef, 
@@ -39,14 +42,12 @@ model_file_map = {
 }
 
 @st.cache_resource
-def load_artifacts(model_filename):
+def load_model(model_filename):
     try:
-        model = joblib.load(f'model/{model_filename}')
-        preprocessor = joblib.load('model/preprocessor.joblib')
-        return model, preprocessor
+        return joblib.load(f'model/{model_filename}')
     except Exception as e:
-        st.error(f"Error loading saved artifacts from 'model/' directory: {e}")
-        return None, None
+        st.error(f"Error loading model from 'model/' directory: {e}")
+        return None
 
 def clean_target_series(series):
     """Safely converts string/boolean/numeric target series into binary 0/1 integers."""
@@ -69,18 +70,32 @@ if uploaded_file is not None:
     if 'Churn' not in df_test.columns:
         st.error("Uploaded CSV must contain the target column 'Churn'.")
     else:
-        model, preprocessor = load_artifacts(model_file_map[model_option])
+        model = load_model(model_file_map[model_option])
         
-        if model is not None and preprocessor is not None:
+        if model is not None:
+            # Clean target array to binary integers (0/1)
             y_true = clean_target_series(df_test['Churn'])
                 
+            # Clean numeric TotalCharges feature
             df_test['TotalCharges'] = pd.to_numeric(df_test['TotalCharges'].replace(' ', np.nan), errors='coerce')
             df_test['TotalCharges'] = df_test['TotalCharges'].fillna(df_test['TotalCharges'].median())
             
+            # Separate features
             X_test = df_test.drop(columns=['customerID', 'Churn'], errors='ignore')
             
-            X_test_prep = preprocessor.transform(X_test)
+            # Dynamically build and fit preprocessor on runtime scikit-learn version
+            num_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']
+            cat_cols = [c for c in X_test.columns if c not in num_cols]
             
+            preprocessor = ColumnTransformer(
+                transformers=[
+                    ('num', StandardScaler(), num_cols),
+                    ('cat', OneHotEncoder(drop='first', sparse_output=False, handle_unknown='ignore'), cat_cols)
+                ]
+            )
+            X_test_prep = preprocessor.fit_transform(X_test)
+            
+            # Generate predictions
             y_pred = model.predict(X_test_prep).astype(int)
             y_proba = model.predict_proba(X_test_prep)[:, 1] if hasattr(model, "predict_proba") else y_pred
             
